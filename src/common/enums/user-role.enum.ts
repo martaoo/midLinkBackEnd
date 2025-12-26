@@ -1,0 +1,8 @@
+export enum UserRole {
+  SYSTEM_ADMIN = 'SYSTEM_ADMIN',
+  HOSPITAL_ADMIN = 'HOSPITAL_ADMIN',
+  DOCTOR = 'DOCTOR',
+  LIAISON_OFFICER = 'LIAISON_OFFICER',
+  STAMP_OFFICER = 'STAMP_OFFICER',
+  GATEKEEPER = 'GATEKEEPER', // optional, handles patient entry verification
+}
