@@ -3,6 +3,7 @@ export enum UserRole {
   HOSPITAL_ADMIN = 'HOSPITAL_ADMIN',
   DOCTOR = 'DOCTOR',
   LIAISON_OFFICER = 'LIAISON_OFFICER',
-  STAMP_OFFICER = 'STAMP_OFFICER',
-  GATEKEEPER = 'GATEKEEPER', // optional, handles patient entry verification
+  SPECIALIST='SPECIALIST',
+  GATEKEEPER = 'GATEKEEPER',
+  HOSPITAL_APPROVER='HOSPITAL_APPROVER' // optional, handles patient entry verification
 }

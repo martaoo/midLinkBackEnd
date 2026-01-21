@@ -23,12 +23,22 @@ export class UsersController {
 
   // --- CREATE USER (Hospital Admin or System Admin only) ---
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.HOSPITAL_ADMIN, UserRole.SYSTEM_ADMIN)
-  @Post()
-  async createUser(@Req() req, @Body() createUserDto: CreateUserDto) {
-    const hospitalId = req.user.role === UserRole.HOSPITAL_ADMIN ? req.user.hospitalId : undefined;
-    return this.usersService.createUser(createUserDto, hospitalId);
-  }
+@Roles(UserRole.HOSPITAL_ADMIN, UserRole.SYSTEM_ADMIN)
+@Post()
+async createUser(@Req() req, @Body() createUserDto: CreateUserDto) {
+  const creatorRole = req.user.role;
+
+  const hospitalId =
+    creatorRole === UserRole.HOSPITAL_ADMIN
+      ? req.user.hospitalId
+      : createUserDto.hospitalId;
+
+  return this.usersService.createUser(
+    createUserDto,
+    creatorRole,
+    hospitalId,
+  );
+}
 
   // --- GET ALL USERS ---
   @UseGuards(JwtAuthGuard, RolesGuard)
