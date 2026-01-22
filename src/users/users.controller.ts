@@ -60,12 +60,25 @@ async createUser(@Req() req, @Body() createUserDto: CreateUserDto) {
 
   // --- UPDATE USER ---
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.HOSPITAL_ADMIN, UserRole.SYSTEM_ADMIN)
-  @Patch(':id')
-  async updateUser(@Req() req, @Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    const hospitalId = req.user.role === UserRole.HOSPITAL_ADMIN ? req.user.hospitalId : undefined;
-    return this.usersService.updateUser(id, updateUserDto, hospitalId);
-  }
+@Roles(UserRole.HOSPITAL_ADMIN, UserRole.SYSTEM_ADMIN)
+@Patch(':id')
+async updateUser(
+  @Req() req,
+  @Param('id') id: string,
+  @Body() updateUserDto: UpdateUserDto
+) {
+  const hospitalId =
+    req.user.role === UserRole.HOSPITAL_ADMIN
+      ? req.user.hospitalId
+      : undefined;
+
+  return this.usersService.updateUser(
+    id,
+    updateUserDto,
+    req.user.role,   // ✅ FIX
+    hospitalId
+  );
+}
 
   // --- DELETE USER ---
   @UseGuards(JwtAuthGuard, RolesGuard)

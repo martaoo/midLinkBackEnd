@@ -65,7 +65,10 @@ async getIncoming(@Req() req) {
     @Body() dto: RespondReferralDto,
     @Req() req,
   ) {
-    return this.referralsService.respondToReferral(id, dto, req.user.id);
+    return this.referralsService.respondToReferral(id, 
+    dto, 
+    req.user.id,          // responderId
+    req.user.hospitalId);
   }
 
   // ────────────── GATE / SECURITY OFFICER ──────────────
@@ -77,7 +80,7 @@ async getIncoming(@Req() req) {
 
   // ────────────── SPECIALIST ──────────────
   @Post('unlock')
-  @Roles(UserRole.SPECIALIST)
+  @Roles(UserRole.SPECIALIST,UserRole.LIAISON_OFFICER)
   async unlockReferral(@Body() dto: UnlockReferralDto, @Req() req) {
     return this.referralsService.unlockReferral(dto, req.user.id);
   }
@@ -85,13 +88,22 @@ async getIncoming(@Req() req) {
   // ────────────── SPECIALIST FEEDBACK ──────────────
   // ────────────── SPECIALIST FEEDBACK ──────────────
   @Patch(':id/complete')
-  @Roles(UserRole.SPECIALIST)
+  @Roles(UserRole.SPECIALIST,UserRole.LIAISON_OFFICER)
   async submitFeedback(
     @Param('id') id: string,
     @Body() dto: SubmitFeedbackDto, // Use the DTO directly
     @Req() req,
   ) {
     return this.referralsService.submitFeedback(id, dto.feedbackNote, req.user.id);
+  }
+  @Get('liaison/outbox')
+  @Roles(UserRole.LIAISON_OFFICER, UserRole.DOCTOR)
+  async getLiaisonOutbox(@Req() req) {
+    const hospitalId = req.user.hospitalId;
+    if (!hospitalId) {
+      throw new ForbiddenException('User is not assigned to a hospital');
+    }
+    return this.referralsService.getDraftsByHospital(hospitalId);
   }
 } // Don't forget the closing bracket for the class!
 

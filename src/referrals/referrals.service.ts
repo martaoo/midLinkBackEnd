@@ -164,65 +164,95 @@ async attachFile(referralId: string, filePath: string,uploaderHospitalId: string
 
   // 3. RESPOND TO REFERRAL
   async respondToReferral(
-    referralId: string,
-    dto: RespondReferralDto,
-    responderId: string,
-  ): Promise<Referral> {
-    const session: ClientSession = await this.referralModel.db.startSession();
-    session.startTransaction();
+  referralId: string,
+  dto: RespondReferralDto,
+  responderId: string,
+  responderHospitalId: string, // Added this for security!
+): Promise<Referral> {
+  const session: ClientSession = await this.referralModel.db.startSession();
+  session.startTransaction();
 
-    try {
-      
-      const referral = await this.referralModel.findById(referralId).session(session);
-      if (!referral) throw new NotFoundException('Referral not found');
-      if (referral.status !== ReferralStatus.PENDING)
-        throw new BadRequestException('Referral already processed');
+  try {
+    // 1. Fetch Referral and include Hospital details
+    const referral = await this.referralModel.findById(referralId).session(session);
+    if (!referral) throw new NotFoundException('Referral not found');
 
-      if (dto.status !== ReferralStatus.ACCEPTED && !dto.justification)
-        throw new BadRequestException('Justification is required');
-
-      referral.status = dto.status;
-      referral.acceptedAt =
-        dto.status === ReferralStatus.ACCEPTED ? new Date() : undefined;
-
-      referral.decisionMeta = {
-        responderId,
-        justification: dto.justification,
-        appointmentDate: dto.appointmentDate ? new Date(dto.appointmentDate) : undefined,
-      };
-
-      referral.activityLog.push({
-        status: dto.status,
-        actor: responderId,
-        note: 'Decision recorded by receiving hospital',
-        timestamp: new Date(),
-      });
-
-      const saved = await referral.save({ session });
-      await session.commitTransaction();
-
-      await this.notificationService.notifyReferralResponded(
-        saved._id.toString(),
-        dto.status,
-        [referral.createdBy],
-      );
-
-      return saved;
-    } catch (err) {
-      await session.abortTransaction();
-      throw err;
-    } finally {
-      session.endSession();
+    // SECURITY: Ensure the responder belongs to the TARGET hospital
+    if (referral.toHospital.toString() !== responderHospitalId.toString()) {
+      throw new ForbiddenException('Your hospital is not authorized to respond to this referral');
     }
+
+    if (referral.status !== ReferralStatus.PENDING)
+      throw new BadRequestException('Referral already processed');
+
+    if (dto.status !== ReferralStatus.ACCEPTED && !dto.justification)
+      throw new BadRequestException('Justification is required for rejections/holds');
+
+    // 2. Handle Acceptance & OTP
+    if (dto.status === ReferralStatus.ACCEPTED) {
+      const rawOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      referral.otpHash = await bcrypt.hash(rawOtp, 10);
+      referral.otpExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h validity
+      referral.acceptedAt = new Date();
+
+      // Fetch patient to get phone and target hospital to get name
+      const [patient, targetHospital] = await Promise.all([
+        this.patientService.findById(referral.patientId.toString()),
+        this.hospitalModel.findById(referral.toHospital)
+      ]);
+
+      if (patient && targetHospital) {
+        await this.notificationService.sendOtpToPatient(
+          patient.phone, 
+          rawOtp, 
+          targetHospital.name
+        );
+      }
+    }
+
+    // 3. Update Status and Decision Metadata
+    referral.status = dto.status;
+    referral.decisionMeta = {
+      responderId,
+      justification: dto.justification,
+      appointmentDate: dto.appointmentDate ? new Date(dto.appointmentDate) : undefined,
+    };
+
+    referral.activityLog.push({
+      status: dto.status,
+      actor: responderId,
+      note: `Decision (${dto.status}) recorded by receiving hospital`,
+      timestamp: new Date(),
+    });
+
+    const saved = await referral.save({ session });
+    await session.commitTransaction();
+
+    // 4. Notify the Originating Doctor
+    await this.notificationService.notifyReferralResponded(
+      saved._id.toString(),
+      dto.status,
+      [referral.createdBy.toString()],
+    );
+
+    return saved;
+  } catch (err) {
+    await session.abortTransaction();
+    throw err;
+  } finally {
+    session.endSession();
   }
+}
+
+// 5. GET INCOMING (Corrected to ensure only PENDING are seen)
 async getIncomingReferrals(hospitalId: string): Promise<Referral[]> {
-  // We only return referrals where the 'toHospital' matches the user's hospital
   return this.referralModel.find({
     toHospital: hospitalId, 
     status: ReferralStatus.PENDING 
   })
-  .populate('fromHospital', 'name') // Shows the name of the sending hospital
-  .populate('createdBy', 'fullName') // Shows the name of the doctor who wrote it
+  .populate('fromHospital', 'name')
+  .populate('createdBy', 'fullName')
   .sort({ createdAt: -1 });
 }
   // 4. GATE CHECK-IN
@@ -230,14 +260,16 @@ async getIncomingReferrals(hospitalId: string): Promise<Referral[]> {
     const referral = await this.referralModel.findOne({ referralCode: dto.referralCode });
     if (!referral) throw new NotFoundException('Referral not found');
 
+    // If already checked in, return the existing document immediately
+    if (referral.gateCheckedInAt) {
+      return referral; 
+    }
+
     if (
       referral.status !== ReferralStatus.ACCEPTED &&
       referral.status !== ReferralStatus.SCHEDULED
     )
       throw new BadRequestException('Referral not valid for entry');
-
-    if (referral.gateCheckedInAt)
-      throw new BadRequestException('Patient already checked in');
 
     referral.gateCheckedInAt = new Date();
     referral.status = ReferralStatus.CHECKED_IN;
@@ -251,13 +283,18 @@ async getIncomingReferrals(hospitalId: string): Promise<Referral[]> {
 
     const saved = await referral.save();
 
-    await this.notificationService.notifyPatientArrived(
-      saved._id.toString(),
-      [referral.createdBy],
-    );
+    // Wrap in try-catch so notification failures don't block the return
+    try {
+      await this.notificationService.notifyPatientArrived(
+        saved._id.toString(),
+        [referral.createdBy],
+      );
+    } catch (e) {
+      console.error('Notification failed', e);
+    }
 
     return saved;
-  }
+}
 
   // 5. UNLOCK CLINICAL DATA
   async unlockReferral(dto: UnlockReferralDto, specialistId: string): Promise<Referral> {
@@ -383,4 +420,14 @@ async getIncomingReferrals(hospitalId: string): Promise<Referral[]> {
 
     return referral;
   }
+  // 9. LIAISON OUTBOX (Drafts waiting to be sent)
+async getDraftsByHospital(hospitalId: string): Promise<Referral[]> {
+  return this.referralModel.find({
+    fromHospital: hospitalId,
+    status: ReferralStatus.DRAFT
+  })
+  .populate('patientId', 'name')
+  .populate('createdBy', 'fullName')
+  .sort({ createdAt: -1 });
+}
 }

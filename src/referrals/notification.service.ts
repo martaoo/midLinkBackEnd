@@ -103,4 +103,14 @@ export class NotificationService {
       recipients,
     });
   }
+  // notification.service.ts
+async sendOtpToPatient(phone: string, otp: string, hospitalName: string) {
+  const message = `Your referral to ${hospitalName} is accepted. Use OTP: ${otp} to unlock your clinical data at the hospital.`;
+  
+  // If you don't have an SMS provider yet, just log it:
+  console.log(`[SMS SENT TO ${phone}]: ${message}`);
+  
+  // Integration example (Twilio):
+  // await this.twilioClient.messages.create({ body: message, to: phone, from: '...' });
+}
 }
