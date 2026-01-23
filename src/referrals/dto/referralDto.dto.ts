@@ -21,12 +21,12 @@ import { CreatePatientDto } from 'src/patients/dto/create-patient.dto';
 // CREATE REFERRAL DTO
 // ─────────────────────────────────────────
 export class CreateReferralDto {
-  @IsMongoId()
-  @IsNotEmpty()
-  fromHospital: string;
- @IsString()      // Add this
-  @IsNotEmpty()    // Add this
-  doctorName: string;
+ // @IsMongoId()
+  //@IsNotEmpty()
+  //fromHospital: string;
+ //@IsString()      // Add this
+  //@IsNotEmpty()    // Add this
+  //doctorName: string;
 
   @IsOptional()    // Add this
   @IsMongoId()     // Add this
