@@ -100,6 +100,9 @@ export class GateCheckInDto {
 export class RespondReferralDto {
   @IsEnum(ReferralStatus)
   status: ReferralStatus;
+  @IsOptional()
+  @IsString()
+  targetDepartment?: string;
 
   // LOGIC: If status is REJECTED, justification MUST be provided
   @ValidateIf(o => o.status === ReferralStatus.REJECTED)

@@ -118,5 +118,21 @@ async getIncoming(@Req() req) {
     }
     return this.referralsService.getDraftsByHospital(hospitalId);
   }
+
+  @Get('specialist/queue')
+  @Roles(UserRole.LIAISON_OFFICER, UserRole.DOCTOR,UserRole.SPECIALIST)
+  async getSpecialistQueue(@Req() req) {
+    /**
+     * req.user is usually populated by your Passport JWT Strategy.
+     * It should contain the user's hospitalId.
+     */
+    const hospitalId = req.user.hospitalId;
+    
+    if (!hospitalId) {
+      throw new BadRequestException('User hospital information missing');
+    }
+
+    return await this.referralsService.getSpecialistQueue(hospitalId);
+  }
 } // Don't forget the closing bracket for the class!
 

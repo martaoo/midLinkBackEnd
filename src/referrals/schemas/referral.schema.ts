@@ -89,7 +89,8 @@ export class Referral {
 
   @Prop()
   completedAt?: Date;
-
+@Prop({ type: String }) // or use an Enum if departments are fixed
+targetDepartment: string;
   // ─────────────────────────────────────────
   // DECISION METADATA (Receiving Hospital)
   // ─────────────────────────────────────────

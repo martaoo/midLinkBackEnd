@@ -268,7 +268,7 @@ async createReferral(
     try {
       await this.notificationService.notifyPatientArrived(
         saved._id.toString(),
-        [referral.createdBy],
+        [referral.createdBy,referral.toHospital],
       );
     } catch (e) {
       console.error('Notification failed', e);
@@ -421,4 +421,20 @@ async createReferral(
     .populate('createdBy', 'fullName')
     .sort({ createdAt: -1 });
   }
-}
+  // ... existing methods (unlockReferral, submitFeedback, etc.)
+
+  // 10. SPECIALIST WORKLIST
+  // This is what the Doctor/Specialist sees on their dashboard
+  async getSpecialistQueue(hospitalId: string): Promise<Referral[]> {
+    return this.referralModel.find({
+      toHospital: hospitalId,
+      // We show both 'ACCEPTED' (upcoming) and 'CHECKED_IN' (patient is here)
+      status: { 
+        $in: [ReferralStatus.ACCEPTED, ReferralStatus.CHECKED_IN] 
+      }
+    })
+    .populate('patientId') // This pulls in the patient details (name, age, etc.)
+    .populate('fromHospital', 'name') // Shows which hospital sent them
+    .sort({ gateCheckedInAt: -1, createdAt: -1 }); // Show recently arrived patients first
+  }
+} // End of ReferralsService class
