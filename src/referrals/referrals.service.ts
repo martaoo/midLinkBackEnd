@@ -216,7 +216,7 @@ async createReferral(
       await this.notificationService.notifyReferralResponded(
         saved._id.toString(),
         dto.status,
-        [referral.createdBy.toString()],
+        [referral.createdBy.toString(),referral.fromHospital.toString(),],
       );
 
       return saved;
