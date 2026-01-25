@@ -101,59 +101,69 @@ async createReferral(
   }
 
   // 2. FINALIZE & SEND (Liaison Officer)
-  async finalizeAndSend(
-    referralId: string,
-    liaisonId: string,
-    liaisonHospitalId: string,
-    targetHospitalId: string,
-    liaisonName: string,
-  ): Promise<Referral> {
-    const referral = await this.referralModel.findById(referralId);
-    if (!referral) throw new NotFoundException('Referral not found');
+async finalizeAndSend(
+  referralId: string,
+  liaisonId: string,
+  liaisonHospitalId: string,
+  targetHospitalId: string, // This comes in as a string
+  liaisonName: string,
+): Promise<Referral> {
+  const referral = await this.referralModel.findById(referralId);
+  
+  if (!referral) throw new NotFoundException('Referral not found');
 
-    if (referral.fromHospital.toString() !== liaisonHospitalId.toString()) {
-      throw new ForbiddenException('You are not allowed to send referrals from another hospital');
-    }
+  // 1. Security Check: Liaison must belong to the 'from' hospital
+  if (referral.fromHospital.toString() !== liaisonHospitalId.toString()) {
+    throw new ForbiddenException('You are not allowed to send referrals from another hospital');
+  }
 
-    if (liaisonHospitalId === targetHospitalId) {
-      throw new BadRequestException('Target hospital cannot be the same as the originating hospital');
-    }
+  // 2. Validation: Cannot refer to yourself
+  if (liaisonHospitalId === targetHospitalId) {
+    throw new BadRequestException('Target hospital cannot be the same as the originating hospital');
+  }
 
-    if (referral.status !== ReferralStatus.DRAFT) {
-      throw new BadRequestException('Referral already finalized');
-    }
+  // 3. State Check: Must be a DRAFT
+  if (referral.status !== ReferralStatus.DRAFT) {
+    throw new BadRequestException('Referral already finalized');
+  }
 
-    if (referral.toHospital) {
-      throw new BadRequestException('Target hospital already assigned');
-    }
+  // 4. Target Hospital Verification
+  const targetHospital = await this.hospitalModel.findById(targetHospitalId);
+  if (!targetHospital) {
+    throw new NotFoundException('Target hospital does not exist');
+  }
 
-    const targetHospital = await this.hospitalModel.findById(targetHospitalId);
-    if (!targetHospital) {
-      throw new NotFoundException('Target hospital does not exist');
-    }
+  // 5. THE FIX: Explicitly cast the string ID to a Mongoose ObjectId
+  // This ensures MongoDB actually saves the field
+  referral.toHospital = new Types.ObjectId(targetHospitalId) as any; 
+  
+  referral.status = ReferralStatus.PENDING;
+  referral.expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
-    referral.toHospital = targetHospitalId;
-    referral.status = ReferralStatus.PENDING;
-    referral.expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+  // 6. Audit Trail
+  referral.activityLog.push({
+    status: ReferralStatus.PENDING,
+    actor: liaisonId,
+    note: `Referral dispatched to ${targetHospital.name} by ${liaisonName}`,
+    timestamp: new Date(),
+  });
 
-    referral.activityLog.push({
-      status: ReferralStatus.PENDING,
-      actor: liaisonId,
-      note: `Referral dispatched to ${targetHospital.name} by ${liaisonName}`,
-      timestamp: new Date(),
-    });
+  // 7. Save and Return
+  const saved = await referral.save();
 
-    const saved = await referral.save();
-
+  // 8. Notifications
+  try {
     await this.notificationService.notifyReferralSent(
       saved._id.toString(),
       targetHospital.name,
       [targetHospitalId],
     );
-
-    return saved;
+  } catch (err) {
+    console.error('Notification failed but referral was saved:', err);
   }
 
+  return saved;
+}
   // 3. RESPOND TO REFERRAL
   async respondToReferral(
     referralId: string,
@@ -167,7 +177,13 @@ async createReferral(
     try {
       const referral = await this.referralModel.findById(referralId).session(session);
       if (!referral) throw new NotFoundException('Referral not found');
-
+      console.log('DEBUG:', { 
+  toHospital: referral.toHospital, 
+  responderId: responderHospitalId 
+});
+     if (!referral.toHospital) {
+      throw new BadRequestException('This referral does not have a destination hospital assigned.');
+    }
       if (referral.toHospital.toString() !== responderHospitalId.toString()) {
         throw new ForbiddenException('Your hospital is not authorized to respond to this referral');
       }
@@ -437,4 +453,40 @@ async createReferral(
     .populate('fromHospital', 'name') // Shows which hospital sent them
     .sort({ gateCheckedInAt: -1, createdAt: -1 }); // Show recently arrived patients first
   }
+  async getHospitalDashboard(hospitalId: string, type: 'inbound' | 'outbound'): Promise<Referral[]> {
+  const query = type === 'inbound' 
+    ? { toHospital: hospitalId } 
+    : { fromHospital: hospitalId };
+
+  // This ensures that even if someone manipulates the request, 
+  // they only get data where their hospitalId matches the specific direction.
+  return this.referralModel.find(query)
+    .populate('patientId', 'fullName phone')
+    .populate('fromHospital', 'name')
+    .populate('toHospital', 'name')
+    .sort({ createdAt: -1 });
+}
+async getReferralById(referralId: string, hospitalId: string): Promise<Referral> {
+  const referral = await this.referralModel.findOne({
+    _id: referralId,
+    $or: [
+      { fromHospital: hospitalId },
+      { toHospital: hospitalId }
+    ]
+  })
+  .populate('fromHospital', 'name')
+  .populate('toHospital', 'name')
+  .populate('patientId')
+  .populate('createdBy', 'fullName')
+  .populate('activityLog.actor', 'fullName')
+  .populate('decisionMeta.responderId', 'fullName');
+
+  if (!referral) {
+    // We throw NotFound even if it exists in the DB but belongs to another hospital
+    // to prevent "ID fishing" or data leaking.
+    throw new NotFoundException(`Referral not found or access denied.`);
+  }
+
+  return referral;
+}
 } // End of ReferralsService class

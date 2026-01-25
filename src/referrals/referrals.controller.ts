@@ -19,7 +19,7 @@ export class ReferralsController {
 
   // ────────────── DOCTOR ──────────────
 @Post()
-@Roles(UserRole.DOCTOR)
+@Roles(UserRole.DOCTOR,UserRole.LIAISON_OFFICER)
 async createReferral(@Body() dto: CreateReferralDto, @Req() req) {
   // 1. Extract info from the JWT (req.user)
   // Ensure your AuthGuard/Strategy populates these fields
@@ -134,5 +134,15 @@ async getIncoming(@Req() req) {
 
     return await this.referralsService.getSpecialistQueue(hospitalId);
   }
+  @Get(':id')
+async getOne(@Param('id') id: string, @Req() req) {
+  // req.user.hospitalId comes from your AuthGuard
+  return this.referralsService.getReferralById(id, req.user.hospitalId);
+}
+
+@Get('dashboard/:type')
+async getDashboard(@Param('type') type: 'inbound' | 'outbound', @Req() req) {
+  return this.referralsService.getHospitalDashboard(req.user.hospitalId, type);
+}
 } // Don't forget the closing bracket for the class!
 
