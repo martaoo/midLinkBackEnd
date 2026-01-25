@@ -110,13 +110,13 @@ async getIncoming(@Req() req) {
     return this.referralsService.submitFeedback(id, dto.feedbackNote, req.user.id);
   }
   @Get('liaison/outbox')
-  @Roles(UserRole.LIAISON_OFFICER, UserRole.DOCTOR)
+  @Roles(UserRole.LIAISON_OFFICER, UserRole.DOCTOR,UserRole.HOSPITAL_ADMIN)
   async getLiaisonOutbox(@Req() req) {
     const hospitalId = req.user.hospitalId;
     if (!hospitalId) {
       throw new ForbiddenException('User is not assigned to a hospital');
     }
-    return this.referralsService.getDraftsByHospital(hospitalId);
+    return this.referralsService.getOutgoingReferrals(hospitalId);
   }
 
   @Get('specialist/queue')
@@ -135,6 +135,7 @@ async getIncoming(@Req() req) {
     return await this.referralsService.getSpecialistQueue(hospitalId);
   }
   @Get(':id')
+  @Roles(UserRole.LIAISON_OFFICER, UserRole.DOCTOR,UserRole.SPECIALIST)
 async getOne(@Param('id') id: string, @Req() req) {
   // req.user.hospitalId comes from your AuthGuard
   return this.referralsService.getReferralById(id, req.user.hospitalId);

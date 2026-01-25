@@ -428,15 +428,17 @@ async finalizeAndSend(
   }
 
   // 9. LIAISON OUTBOX
-  async getDraftsByHospital(hospitalId: string): Promise<Referral[]> {
-    return this.referralModel.find({
+  async getOutgoingReferrals(hospitalId: string): Promise<Referral[]> {
+  return this.referralModel
+    .find({
       fromHospital: hospitalId,
-      status: ReferralStatus.DRAFT
     })
-    .populate('patientId', 'name')
+    .populate('patientId')          // full patient
     .populate('createdBy', 'fullName')
+    .populate('toHospital', 'name')
     .sort({ createdAt: -1 });
-  }
+}
+
   // ... existing methods (unlockReferral, submitFeedback, etc.)
 
   // 10. SPECIALIST WORKLIST
