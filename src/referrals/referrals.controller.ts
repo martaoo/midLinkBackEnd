@@ -1,4 +1,4 @@
-import { Controller, Post, Patch, Body, Param, UseGuards, Req, BadRequestException, Get, ForbiddenException } from '@nestjs/common';
+import { Controller, Post, Patch, Body, Param, UseGuards, Req, BadRequestException, Get, ForbiddenException, Query } from '@nestjs/common';
 import { ReferralsService } from './referrals.service';
 import { 
   CreateReferralDto, 
@@ -93,7 +93,7 @@ async getIncoming(@Req() req) {
 
   // ────────────── SPECIALIST ──────────────
   @Post('unlock')
-  @Roles(UserRole.SPECIALIST,UserRole.LIAISON_OFFICER)
+  @Roles(UserRole.DOCTOR, UserRole.SPECIALIST, UserRole.LIAISON_OFFICER)
   async unlockReferral(@Body() dto: UnlockReferralDto, @Req() req) {
     return this.referralsService.unlockReferral(dto, req.user.id,req.user.hospitalId);
   }
@@ -141,9 +141,27 @@ async getOne(@Param('id') id: string, @Req() req) {
   return this.referralsService.getReferralById(id, req.user.hospitalId);
 }
 
-@Get('dashboard/:type')
+  // ────────────── HOSPITAL DASHBOARD ──────────────
+  @Get()
+  @Roles(UserRole.LIAISON_OFFICER, UserRole.DOCTOR, UserRole.SPECIALIST, UserRole.HOSPITAL_ADMIN, UserRole.HOSPITAL_APPROVER)
+  async getReferrals(
+    @Req() req,
+    @Query('type') type: 'inbound' | 'outbound' = 'outbound',
+  ) {
+    const hospitalId = req.user.hospitalId;
+    
+    if (!hospitalId) {
+      throw new BadRequestException('User hospital information missing');
+    }
+
+    return this.referralsService.getHospitalDashboard(
+      hospitalId,
+      type,
+    );
+  }
+
+  @Get('dashboard/:type')
 async getDashboard(@Param('type') type: 'inbound' | 'outbound', @Req() req) {
   return this.referralsService.getHospitalDashboard(req.user.hospitalId, type);
 }
 } // Don't forget the closing bracket for the class!
-
