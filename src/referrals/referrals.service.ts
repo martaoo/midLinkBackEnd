@@ -294,65 +294,66 @@ async finalizeAndSend(
   }
 
   // 5. UNLOCK CLINICAL DATA
-  async unlockReferral(dto: UnlockReferralDto, specialistId: string, specialistHospitalId: string): Promise<Referral> {
-    const referral = await this.referralModel.findOne({ referralCode: dto.referralCode });
-    if (!referral) throw new NotFoundException('Referral not found');
+ async unlockReferral(
+  dto: UnlockReferralDto,
+  specialistId: string,
+  specialistHospitalId: string,
+): Promise<Referral> {
+  const referral = await this.referralModel
+    .findOne({ referralCode: dto.referralCode })
+    .populate('patientId')
+    .populate('fromHospital', 'name')
+    .populate('toHospital', 'name');
 
-    // SECURITY FIX: Ensure the specialist belongs to the destination hospital
-    if (referral.toHospital.toString() !== specialistHospitalId.toString()) {
-      throw new ForbiddenException('You are not authorized to unlock referrals for this hospital');
-    }
-
-    if (!referral.gateCheckedInAt)
-      throw new BadRequestException('Patient has not checked in yet');
-    
-    if (referral.isUnlocked)
-      throw new BadRequestException('Referral already unlocked');
-
-    if (
-      referral.status !== ReferralStatus.ACCEPTED &&
-      referral.status !== ReferralStatus.CHECKED_IN
-    )
-      throw new BadRequestException('Referral not eligible for unlock');
-
-    /* OTP: Comparison logic commented out
-    if (referral.otpExpiresAt && referral.otpExpiresAt.getTime() < Date.now())
-      throw new ForbiddenException('OTP expired');
-
-    if (referral.otpAttempts >= 3)
-      throw new ForbiddenException('OTP locked');
-
-    if (!referral.otpHash) throw new BadRequestException('OTP not set');
-
-    const validOtp = await bcrypt.compare(dto.otp, referral.otpHash);
-    if (!validOtp) {
-      referral.otpAttempts += 1;
-      await referral.save();
-      throw new ForbiddenException('Invalid OTP');
-    }
-    */
-
-    referral.isUnlocked = true;
-    // referral.otpHash = undefined; // OTP: Commented out
-    // referral.otpExpiresAt = undefined; // OTP: Commented out
-    // referral.otpAttempts = 0; // OTP: Commented out
-
-    referral.activityLog.push({
-      status: referral.status,
-      actor: specialistId,
-      note: 'Clinical data unlocked by specialist',
-      timestamp: new Date(),
-    });
-
-    const saved = await referral.save();
-
-    await this.notificationService.notifyClinicalDataUnlocked(
-      saved._id.toString(),
-      [referral.createdBy],
-    );
-
-    return saved;
+  if (!referral) {
+    throw new NotFoundException('Referral not found');
   }
+
+  // SECURITY: ensure specialist belongs to destination hospital
+  // Uncomment for production
+  /*
+  if (referral.toHospital.toString() !== specialistHospitalId.toString()) {
+    throw new ForbiddenException(
+      'You are not authorized to unlock referrals for this hospital',
+    );
+  }
+  */
+
+  if (!referral.gateCheckedInAt) {
+    throw new BadRequestException('Patient has not checked in yet');
+  }
+
+  if (referral.isUnlocked) {
+    return referral; // already unlocked
+  }
+
+  if (
+    referral.status !== ReferralStatus.ACCEPTED &&
+    referral.status !== ReferralStatus.CHECKED_IN
+  ) {
+    throw new BadRequestException('Referral not eligible for unlock');
+  }
+
+  // Unlock clinical data
+  referral.isUnlocked = true;
+
+  referral.activityLog.push({
+    status: referral.status,
+    actor: specialistId,
+    note: 'Clinical data unlocked by specialist',
+    timestamp: new Date(),
+  });
+
+  const saved = await referral.save();
+
+  await this.notificationService.notifyClinicalDataUnlocked(
+    saved._id.toString(),
+    [referral.createdBy],
+  );
+
+  return saved;
+}
+
 
   // 6. SUBMIT FEEDBACK
   async submitFeedback(

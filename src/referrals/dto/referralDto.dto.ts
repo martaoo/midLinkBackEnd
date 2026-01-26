@@ -126,5 +126,6 @@ export class UnlockReferralDto {
 
   @IsString()
   @Length(6, 6)
+  @IsOptional()
   otp: string;
 }

@@ -1,4 +1,4 @@
-import { Controller, Post, Patch, Body, Param, UseGuards, Req, BadRequestException, Get, ForbiddenException } from '@nestjs/common';
+import { Controller, Post, Patch, Body, Param, UseGuards, Req, BadRequestException, Get, ForbiddenException, Query } from '@nestjs/common';
 import { ReferralsService } from './referrals.service';
 import { 
   CreateReferralDto, 
@@ -93,7 +93,7 @@ async getIncoming(@Req() req) {
 
   // ────────────── SPECIALIST ──────────────
   @Post('unlock')
-  @Roles(UserRole.SPECIALIST,UserRole.LIAISON_OFFICER)
+  @Roles(UserRole.DOCTOR,UserRole.LIAISON_OFFICER)
   async unlockReferral(@Body() dto: UnlockReferralDto, @Req() req) {
     return this.referralsService.unlockReferral(dto, req.user.id,req.user.hospitalId);
   }
@@ -101,7 +101,7 @@ async getIncoming(@Req() req) {
   // ────────────── SPECIALIST FEEDBACK ──────────────
   // ────────────── SPECIALIST FEEDBACK ──────────────
   @Patch(':id/complete')
-  @Roles(UserRole.SPECIALIST,UserRole.LIAISON_OFFICER)
+  @Roles(UserRole.DOCTOR,UserRole.LIAISON_OFFICER)
   async submitFeedback(
     @Param('id') id: string,
     @Body() dto: SubmitFeedbackDto, // Use the DTO directly
@@ -145,5 +145,17 @@ async getOne(@Param('id') id: string, @Req() req) {
 async getDashboard(@Param('type') type: 'inbound' | 'outbound', @Req() req) {
   return this.referralsService.getHospitalDashboard(req.user.hospitalId, type);
 }
+ @Get()
+  async getReferrals(
+    @Req() req,
+    @Query('type') type: 'inbound' | 'outbound' = 'outbound',
+  ) {
+    const hospitalId = req.user.hospitalId;
+
+    return this.referralsService.getHospitalDashboard(
+      hospitalId,
+      type,
+    );
+  }
 } // Don't forget the closing bracket for the class!
 
