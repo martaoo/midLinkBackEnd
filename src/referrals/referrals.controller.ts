@@ -141,7 +141,10 @@ async getOne(@Param('id') id: string, @Req() req) {
   return this.referralsService.getReferralById(id, req.user.hospitalId);
 }
 
-@Get('dashboard/:type')
+  // ────────────── HOSPITAL DASHBOARD ──────────────
+  
+
+  @Get('dashboard/:type')
 async getDashboard(@Param('type') type: 'inbound' | 'outbound', @Req() req) {
   return this.referralsService.getHospitalDashboard(req.user.hospitalId, type);
 }
@@ -158,4 +161,3 @@ async getDashboard(@Param('type') type: 'inbound' | 'outbound', @Req() req) {
     );
   }
 } // Don't forget the closing bracket for the class!
-

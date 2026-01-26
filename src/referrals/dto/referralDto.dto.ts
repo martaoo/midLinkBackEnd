@@ -21,24 +21,22 @@ import { CreatePatientDto } from 'src/patients/dto/create-patient.dto';
 // CREATE REFERRAL DTO
 // ─────────────────────────────────────────
 export class CreateReferralDto {
- // @IsMongoId()
-  //@IsNotEmpty()
-  //fromHospital: string;
- //@IsString()      // Add this
-  //@IsNotEmpty()    // Add this
-  //doctorName: string;
+  @IsMongoId()
+  @IsNotEmpty()
+  fromHospital: string;
 
-  @IsOptional()    // Add this
-  @IsMongoId()     // Add this
+  @IsString()
+  @IsNotEmpty()
+  doctorName: string;
+
+  @IsOptional()
+  @IsMongoId()
   patientId?: string;
-    @IsObject()
+
+  @IsObject()
   @ValidateNested()
   @Type(() => CreatePatientDto)
   patient?: CreatePatientDto;
-
-  @IsMongoId()
-  @IsOptional()
-  toHospital: string;
 
   @IsString()
   @IsNotEmpty()
@@ -62,6 +60,10 @@ export class CreateReferralDto {
   @IsArray()
   @IsString({ each: true })
   attachments?: string[];
+
+  @IsMongoId()
+  @IsOptional()
+  toHospital: string;
 
   // Optional operational fields
   @IsOptional()
