@@ -466,6 +466,26 @@ async finalizeAndSend(
     .populate('fromHospital', 'name') // Shows which hospital sent them
     .sort({ gateCheckedInAt: -1, createdAt: -1 }); // Show recently arrived patients first
   }
+
+  // Get completed referrals for today
+  async getCompletedReferrals(hospitalId: string): Promise<Referral[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1); // Start of tomorrow
+
+    return this.referralModel.find({
+      toHospital: hospitalId,
+      status: ReferralStatus.COMPLETED,
+      completedAt: {
+        $gte: today,
+        $lt: tomorrow
+      }
+    })
+    .populate('patientId')
+    .populate('fromHospital', 'name')
+    .sort({ completedAt: -1 }); // Most recent completed first
+  }
   async getHospitalDashboard(hospitalId: string, type: 'inbound' | 'outbound'): Promise<Referral[]> {
   const query = type === 'inbound' 
     ? { toHospital: hospitalId } 

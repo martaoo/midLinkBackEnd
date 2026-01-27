@@ -9,6 +9,7 @@ async function bootstrap() {
   // Enable Validation (Important for security)
   app.useGlobalPipes(new ValidationPipe());
   app.enableCors();
+  
   // Swagger Configuration
   const config = new DocumentBuilder()
     .setTitle('MedLink Referral API')

@@ -101,10 +101,10 @@ async getIncoming(@Req() req) {
   // ────────────── SPECIALIST FEEDBACK ──────────────
   // ────────────── SPECIALIST FEEDBACK ──────────────
   @Patch(':id/complete')
-  @Roles(UserRole.SPECIALIST,UserRole.LIAISON_OFFICER)
+  @Roles(UserRole.DOCTOR, UserRole.SPECIALIST, UserRole.LIAISON_OFFICER)
   async submitFeedback(
     @Param('id') id: string,
-    @Body() dto: SubmitFeedbackDto, // Use the DTO directly
+    @Body() dto: SubmitFeedbackDto,
     @Req() req,
   ) {
     return this.referralsService.submitFeedback(id, dto.feedbackNote, req.user.id);
@@ -133,6 +133,18 @@ async getIncoming(@Req() req) {
     }
 
     return await this.referralsService.getSpecialistQueue(hospitalId);
+  }
+
+  @Get('specialist/completed')
+  @Roles(UserRole.LIAISON_OFFICER, UserRole.DOCTOR, UserRole.SPECIALIST)
+  async getCompletedReferrals(@Req() req) {
+    const hospitalId = req.user.hospitalId;
+    
+    if (!hospitalId) {
+      throw new BadRequestException('User hospital information missing');
+    }
+
+    return await this.referralsService.getCompletedReferrals(hospitalId);
   }
   @Get(':id')
   @Roles(UserRole.LIAISON_OFFICER, UserRole.DOCTOR,UserRole.SPECIALIST)

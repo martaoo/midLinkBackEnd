@@ -43,6 +43,14 @@ export class UsersService {
   // --------------------------------------------------
   if (dto.role !== UserRole.SYSTEM_ADMIN) {
 
+    // Hospital Admin can only create DOCTOR or LIAISON_OFFICER roles
+    if (creatorRole === UserRole.HOSPITAL_ADMIN) {
+      const allowedRoles = [UserRole.DOCTOR, UserRole.LIAISON_OFFICER]
+      if (!allowedRoles.includes(dto.role)) {
+        throw new ForbiddenException('Hospital Admins can only create DOCTOR or LIAISON_OFFICER accounts');
+      }
+    }
+
     // Hospital Admin cannot create users outside their hospital
     if (creatorRole === UserRole.HOSPITAL_ADMIN && !hospitalIdFromToken) {
       throw new ForbiddenException('Hospital Admin is not linked to a hospital');
@@ -118,9 +126,19 @@ export class UsersService {
   async updateUser(id: string, dto: UpdateUserDto,creatorRole:UserRole, hospitalId?: string): Promise<User> {
     const user = await this.userModel.findById(id);
     if (!user) throw new NotFoundException('User not found');
-if (dto.role && creatorRole !== UserRole.SYSTEM_ADMIN) {
-  throw new ForbiddenException();
-}
+
+    // Role change permissions
+    if (dto.role && creatorRole !== UserRole.SYSTEM_ADMIN) {
+      // Hospital Admins can only change to DOCTOR or LIAISON_OFFICER roles
+      if (creatorRole === UserRole.HOSPITAL_ADMIN) {
+        const allowedRoles = [UserRole.DOCTOR, UserRole.LIAISON_OFFICER]
+        if (!allowedRoles.includes(dto.role)) {
+          throw new ForbiddenException('Hospital Admins can only assign DOCTOR or LIAISON_OFFICER roles');
+        }
+      } else {
+        throw new ForbiddenException('Only System Admins can change user roles');
+      }
+    }
 
     if (hospitalId && user.hospitalId.toString() !== hospitalId) {
       throw new NotFoundException('User not found in your hospital');
