@@ -102,6 +102,7 @@ async getIncoming(@Req() req) {
   // ────────────── SPECIALIST FEEDBACK ──────────────
   @Patch(':id/complete')
   @Roles(UserRole.DOCTOR, UserRole.SPECIALIST, UserRole.LIAISON_OFFICER)
+  @Roles(UserRole.DOCTOR,UserRole.LIAISON_OFFICER)
   async submitFeedback(
     @Param('id') id: string,
     @Body() dto: SubmitFeedbackDto,
