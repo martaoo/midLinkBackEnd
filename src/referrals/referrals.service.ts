@@ -255,9 +255,14 @@ async finalizeAndSend(
   }
 
   // 4. GATE CHECK-IN
-  async gateCheckIn(dto: GateCheckInDto, gateOfficerId: string): Promise<Referral> {
+  async gateCheckIn(dto: GateCheckInDto, gateOfficerId: string, gateOfficerHospitalId: string): Promise<Referral> {
     const referral = await this.referralModel.findOne({ referralCode: dto.referralCode });
     if (!referral) throw new NotFoundException('Referral not found');
+
+    // SECURITY: Only allow check-in at the receiving hospital
+    if (referral.toHospital.toString() !== gateOfficerHospitalId.toString()) {
+      throw new ForbiddenException('You are not authorized to check in this referral at your hospital');
+    }
 
     if (referral.gateCheckedInAt) {
       return referral;
