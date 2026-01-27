@@ -88,7 +88,7 @@ async getIncoming(@Req() req) {
   @Patch('gate-check-in')
   @Roles(UserRole.LIAISON_OFFICER,UserRole.GATEKEEPER) // Gate officers can be a separate role if needed
   async gateCheckIn(@Body() dto: GateCheckInDto, @Req() req) {
-    return this.referralsService.gateCheckIn(dto, req.user.id);
+    return this.referralsService.gateCheckIn(dto, req.user.id, req.user.hospitalId);
   }
 
   // ────────────── SPECIALIST ──────────────
